@@ -50,7 +50,7 @@ def main():
 
     start = time.time()
     jobs = [(i, total, args.trajectories_per_shard, p, args.seed, shard_dir) for i in indices]
-    with mp.get_context("fork").Pool(min(args.workers, len(jobs))) as pool:
+    with mp.get_context("spawn").Pool(min(args.workers, len(jobs))) as pool:
         for n, path in enumerate(pool.imap_unordered(write_shard, jobs), 1):
             print(f"[{n}/{len(jobs)}] {path} ({time.time() - start:.0f}s)")
 

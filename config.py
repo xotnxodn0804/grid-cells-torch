@@ -30,7 +30,7 @@ class DataGenConfig:
 @dataclass
 class ModelConfig:
     nh_lstm: int = 128
-    nh_bottleneck: int = 256
+    nh_bottleneck: int = 512
     dropout_rates: tuple = (0.5,)
     weight_decay: float = 1e-5
     weight_decay_scope: str = "output_heads"

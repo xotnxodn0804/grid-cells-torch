@@ -14,6 +14,13 @@ def paper_mask_parameters(inner_radius_bins=DEFAULT_INNER_RADIUS_BINS,
     return [(float(inner_radius_bins), float(r)) for r in outer_radii_bins]
 
 
+def deepmind_mask_parameters(nbins: int):
+    # Google DeepMind released code uses 0.2*nbins inside and 10 outer
+    # radii from 0.4*nbins to 1.0*nbins.
+    return [(0.2 * nbins, float(x * nbins))
+            for x in np.linspace(0.4, 1.0, num=10)]
+
+
 def circle_mask(size, radius):
     sz = [math.floor(size[0] / 2), math.floor(size[1] / 2)]
     x = np.expand_dims(np.linspace(-sz[0], sz[1], size[1]), 0).repeat(size[0], 0)

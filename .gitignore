@@ -46,3 +46,11 @@ __pycache__/
 docs/paper/*.pdf
 docs/paper/figures/
 docs/paper/text/
+.venv/
+
+# Local archive
+_local_archive/
+
+# Python virtual environments
+.venv/
+venv/
