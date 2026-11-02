@@ -1,0 +1,97 @@
+{
+  "method": "20x20 Mean 10-annuli, G>0.37 selection, SAC center threshold>0.5, cardinal rays, strict 4-neighbor 6 nearest maxima",
+  "checkpoint": "C:\\Users\\xotnd\\GitHubProjects\\grid-cells-torch\\data\\checkpoints\\sonnet_v127_lstm_512\\checkpoint_epoch299.pt",
+  "epoch": 299,
+  "n_trajectories": 4000,
+  "n_selected_units": 108,
+  "n_scales_measurable": 108,
+  "n_units_any_peak_overlap_lt100": 22,
+  "min_scales_cm": 73.79024325749307,
+  "median_scale_cm": 102.59439074142222,
+  "max_scales_cm": 226.7708094089714,
+  "gmm_bic_exploratory": {
+    "best_k": 3,
+    "means_cm": [
+      87.89632358860545,
+      123.40868169799683,
+      208.09797394742054
+    ],
+    "ratios": [
+      1.4040255230196574,
+      1.686250684183416
+    ],
+    "three_component_fit_for_comparison_only": {
+      "means_cm": [
+        87.89632358860545,
+        123.40868169799683,
+        208.09797394742054
+      ],
+      "adjacent_ratios": [
+        1.4040255230196574,
+        1.686250684183416
+      ],
+      "bic": 1050.0426178197392,
+      "delta_bic_vs_best": 0.0
+    },
+    "bic": [
+      {
+        "k": 1,
+        "bic": 1124.5190678637955,
+        "aic": 1119.154805409547
+      },
+      {
+        "k": 2,
+        "bic": 1064.2408143787575,
+        "aic": 1050.8301582431363
+      },
+      {
+        "k": 3,
+        "bic": 1050.0426178197392,
+        "aic": 1028.5855680027455
+      },
+      {
+        "k": 4,
+        "bic": 1050.1295015736152,
+        "aic": 1020.6260580752489
+      },
+      {
+        "k": 5,
+        "bic": 1059.735393358635,
+        "aic": 1022.185556178896
+      },
+      {
+        "k": 6,
+        "bic": 1050.181282076407,
+        "aic": 1004.5850512152952
+      },
+      {
+        "k": 7,
+        "bic": 1056.6801085216728,
+        "aic": 1003.0374839791883
+      },
+      {
+        "k": 8,
+        "bic": 1070.8605025412198,
+        "aic": 1009.1714843173627
+      }
+    ]
+  },
+  "four_vs_eight_comparison": {
+    "matched_units": 108,
+    "both_measurable": 108,
+    "changed_spacing_count": 38,
+    "median_delta_cm": 0.0,
+    "mean_delta_cm": -5.40134037437022
+  },
+  "paper_comparison_peaks_cm": [
+    47.0,
+    70.0,
+    106.0
+  ],
+  "paper_adjacent_ratios": [
+    1.4893617021276595,
+    1.5142857142857142
+  ],
+  "warning": "Grid spacing with 6 nearest strict local maxima can select SAC-edge artifacts; no overlap filter was applied. GMM clusters need not match paper and are descriptive only.",
+  "cm_per_bin": 11.000000000000002
+}
