@@ -54,3 +54,6 @@ _local_archive/
 # Python virtual environments
 .venv/
 venv/
+
+# Per-unit intermediate analysis data
+/results/sonnet_deepmind20_mean/unit_[0-9][0-9][0-9].npz

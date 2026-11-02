@@ -1,0 +1,44 @@
+{
+  "unit": 212,
+  "epoch": 299,
+  "n_trajectories": 4000,
+  "ratemap_shape": [
+    20,
+    20
+  ],
+  "sac_shape": [
+    39,
+    39
+  ],
+  "gridness_formula": "mean",
+  "gridness": 1.333859898958605,
+  "gridness_best_annulus_radii_bins": [
+    4.0,
+    20.0
+  ],
+  "center_index": [
+    19,
+    19
+  ],
+  "center_threshold_strictly_above": 0.5,
+  "center_axial_extents_bins": {
+    "right (+x)": 4,
+    "left (-x)": 4,
+    "up (+y)": 3,
+    "down (-y)": 3
+  },
+  "exclusion_radius_bins": 4.0,
+  "num_local_maxima_outside_exclusion": 16,
+  "num_selected_peaks": 6,
+  "cm_per_sac_bin": 11.000000000000002,
+  "grid_spacing_bins": 19.026297590440446,
+  "grid_spacing_cm": 209.28927349484493,
+  "angular_gaps_sorted_deg": [
+    66.76235306464861,
+    52.776429194909554,
+    60.46121774044187,
+    66.76235306464858,
+    52.7764291949095,
+    60.461217740441896
+  ]
+}

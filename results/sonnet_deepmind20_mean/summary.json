@@ -1,0 +1,66 @@
+{
+  "method": "20x20; DeepMind public GitHub 10 annuli; 0.2 inner, 0.4..1.0 outer",
+  "formula": "mean",
+  "formula_note": "mean=released GitHub default; minmax=paper-style",
+  "checkpoint": "C:\\Users\\xotnd\\GitHubProjects\\grid-cells-torch\\data\\checkpoints\\sonnet_v127_lstm_512\\checkpoint_epoch299.pt",
+  "epoch": 299,
+  "n_trajectories": 4000,
+  "n_shuffles": 100,
+  "sigma_watershed_only_bins": 0.9,
+  "n_units": 512,
+  "n_valid": 512,
+  "annulus_pixels": [
+    [
+      4.0,
+      8.0
+    ],
+    [
+      4.0,
+      9.333333333333334
+    ],
+    [
+      4.0,
+      10.666666666666666
+    ],
+    [
+      4.0,
+      12.000000000000002
+    ],
+    [
+      4.0,
+      13.333333333333336
+    ],
+    [
+      4.0,
+      14.666666666666668
+    ],
+    [
+      4.0,
+      16.0
+    ],
+    [
+      4.0,
+      17.333333333333336
+    ],
+    [
+      4.0,
+      18.666666666666668
+    ],
+    [
+      4.0,
+      20.0
+    ]
+  ],
+  "mean_observed_gridness": 0.16346165695532197,
+  "mean_shuffle95_cutoff": 0.5094482238436557,
+  "n_above_own_shuffle95": 67,
+  "n_empirical_p_le_0_05": 60,
+  "n_above_historical_0_37": 108,
+  "caveats": [
+    "0.37 was calibrated under a different scoring protocol; historical reference ONLY.",
+    "The watershed field relocation approximates details not fully released by Banino et al.",
+    "The watershed smoothing sigma=0.9 bins is an exploratory setting, not a verified original.",
+    "Do not interpret changed counts as changes in trained weights; this is evaluation only.",
+    "Null95 for each unit and the mean over unit thresholds are not identical rules."
+  ]
+}
