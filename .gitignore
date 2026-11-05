@@ -60,3 +60,5 @@ venv/
 
 # Gridness intermediate cache
 /results/sonnet_deepmind20_mean/cache/
+# DMLab vision image datasets and labels, many GiB; not source code
+data/vision_*/

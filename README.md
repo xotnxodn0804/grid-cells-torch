@@ -329,3 +329,14 @@ For DeepMind Lab installation and RL training, consult `scripts/setup_dmlab.sh`,
 - Results from earlier RL baselines must not be confused with navigation performance of the present supervised model.
 
 This repository is maintained as a reproducible research and exploratory-analysis project. Reported measurements should be interpreted in the context of their specific evaluation settings.
+## 10. Standalone image-only Vision Module experiment (November 2026)
+
+A separate DeepMind Lab experiment trains the existing Vision Module to predict
+place-cell and head-direction-cell activities from a single RGB observation.
+The training labels use actual environment positions and headings; motion speed
+is used only for generating agent trajectories and diagnostics. This experiment
+is **not** joint Grid Network / Actor-Critic training.
+
+See [the image-only vision experiment log](docs/experiments/vision_image_only_2026-11-05.md)
+for the data-generation procedure, checkpoint/resume commands, measured results,
+and limitations. Raw image arrays and checkpoints are local and are not in Git.
