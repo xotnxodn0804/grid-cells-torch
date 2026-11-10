@@ -1,0 +1,6 @@
+training_frames,mode,eval_seed,eval_episodes,mean_hits,first_found,revisits,first_mean_frames,later_mean_frames
+50000000,normal,10023,100,2.71,51,220,,
+100000000,normal,10023,100,5.62,80,482,,
+200000000,normal,10023,100,10.79,87,992,1633.7471,
+500000000,normal,10023,100,10.54,81,973,1458.8148,407.1081
+500000000,zero,10023,100,2.90,81,209,1459.6543,1159.2413

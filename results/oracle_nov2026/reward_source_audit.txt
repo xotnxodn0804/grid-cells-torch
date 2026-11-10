@@ -1,0 +1,553 @@
+ORACLE REWARD/GOAL SOURCE AUDIT
+This is a SOURCE-CODE INSPECTION report, NOT a proof of the bug.
+Question: Is the actual reward/goal world position consistent with
+the coordinate exported as oracle_goal_xy and the converted agent pos?
+Separate questions: reward timing, teleport timing, goal-memory encoding.
+
+
+===========================================================================
+Lua active environment
+===========================================================================
+Path: levels/square_arena_oracle.lua | 285 lines | 78 matches
+   4 | level.
+   5 | 
+   6 | Methods, verbatim spec this implements:
+   7 |   "This comprised a 10x10 square arena, corresponding to a 2.5x2.5m arena... The arena
+   8 |   contained a single, randomly changed, intra-maze cue whose position and colour changed each
+   9 |   episode, as did the texture of the floor, the texture of the walls and the goal location...
+  10 |   The agent always started at the central 6x6 grids (that is, 1.5x1.5m) of the environment...
+  11 |   Upon reaching the goal the agent was teleported to another random location and continued to
+  12 |   navigate with the aim of maximising the number of times it reached the goal before the
+  13 |   episode ended."
+  14 |   Episode length: Supplementary Results 1a states 5,400 steps (~90s) per episode.
+  15 | 
+  16 | GOAL POSITION IS FIXED FOR THE WHOLE EPISODE (2026-08-14 fix). "cue ... changed each episode, as
+  17 | did [floor texture], [wall texture] and [the goal location]" is a list of things that all change
+  18 | on the SAME cadence -- once per 90s episode, not once per goal-touch. This is the paper's Morris
+  19 | water maze framing: the agent must relearn a path back to one fixed hidden goal from repeated
+  20 | random starting points within an episode, not chase a freshly-relocated goal every touch. Only
+  21 | the agent's own spawn point re-randomizes on every touch ("teleported to another random
+  22 | location"). An earlier version of this file re-randomized the goal position (and, worse,
+  23 | recompiled the entire map via q3map2) on every touch -- both a task-design bug and, with 32
+  24 | concurrent RL actors, the dominant cause of a >14x training-throughput collapse (see the
+  25 | RL-agent roadmap plan's "Throughput fix" section). Fixed by splitting `api:start()` (true
+  26 | episode boundary: pick new goal/cue positions + a new floor/wall texture, full map rebuild) from
+  27 | `api:nextMap()` (may fire many times per episode, on every goal touch: only the agent's spawn
+  28 | point changes, via a `''`-mapName "fast restart" -- see
+  29 | `lab/game_scripts/factories/random_goal_factory.lua` for the same pattern -- so no recompile).
+  30 | 
+  31 | Deliberately NOT `require`-ing a shared factory module: the paper's task (single unmarked goal,
+  32 | no scattered reward pickups, a hard central-6x6 spawn constraint) doesn't match
+  33 | `factories.random_goal_factory`'s maze-topology/scattered-fruit assumptions closely enough for a
+  34 | thin wrapper, and any project-owned `rl/factories/*.lua` file couldn't be `require`d from here
+  35 | anyway -- `require` inside an externally-loaded level resolves against the `lab/` submodule's
+  36 | own game_scripts root, not this level's own directory (confirmed empirically via
+  37 | `rl/smoke_test.py`). So this file is self-contained, `require`ing only submodule modules.
+  38 | 
+  39 | Intra-maze cue (2026-08-28 fix): now a wall-mounted texture, not a floating prop -- Fig. 2b's
+  40 | actual picture shows a bright patch flush with the wall, and Methods says the cue "changed on
+  41 | each episode" in colour and position, same cadence as floor/wall texture and goal location.
+  42 | Implemented via the engine's `theme:placeWallDecals` callback (see
+  43 | `deepmind/engine/lua_text_level_maker.cc`'s header comment for the exact contract): the engine
+  44 | hands the callback every valid wall-art location on the compiled map, and the callback -- using
+  45 | the same per-episode-seeded `randomMap` RNG as the goal/floor/wall randomization above -- picks
+  46 | one at random and paints it with one of six distinct colours (`CUE_DECAL_PALETTE`, below) drawn
+  47 | from `game_scripts/themes/texture_sets.lua`'s existing colour-tinted wall textures. Because
+  48 | `placeWallDecals` only fires when `make_map.makeMap` actually recompiles the map -- i.e. only on
+  49 | the `_needFullRebuild` true-episode-boundary path, never on the fast-restart path -- the cue
+  50 | naturally changes once per episode and not on every mid-episode goal touch, matching the
+  51 | floor/wall texture's own cadence for free. `decalFrequency = 0` is passed to
+  52 | `themes.fromTextureSet` to suppress its own random decorative wall decals (which would otherwise
+  53 | add unrelated visual noise indistinguishable from the one reward-relevant cue).
+  54 | Unverified against an actual DMLab build/render (this workspace has no dmlab_module.so built --
+  55 | see `grid-cells-torch/README.md`'s RL environment setup) -- the decal texture's UV fit at a wall
+  56 | face has only been checked by reading `lua_text_level_maker.cc`'s C++ side, not by looking at
+  57 | rendered output.
+  58 | 
+  59 | Distal cues ("buildings rendered at infinity"): CONFIRMED already implemented, no changes
+  60 | needed. An earlier version of this file's header claimed no distant-buildings skybox asset
+  ...
+  76 | local custom_observations = require 'decorators.custom_observations'
+  77 | local debug_observations = require 'decorators.debug_observations'
+  78 | local make_map = require 'common.make_map'
+  79 | local map_maker = require 'dmlab.system.map_maker'
+  80 | local pickups = require 'common.pickups'
+  81 | local random = require 'common.random'
+  82 | local themes = require 'themes.themes'
+  83 | local texture_sets = require 'themes.texture_sets'
+  84 | local timeout = require 'decorators.timeout'
+  85 | local randomMap = random(map_maker:randomGen())
+  86 | 
+  87 | -- 10x10 interior grid = the paper's "10x10 square arena"; each cell is 0.25m (2.5m / 10).
+  ...
+ 101 |     {tex = 'map/lab_games/lg_style_03_wall_orange_bright'},
+ 102 |     {tex = 'map/lab_games/lg_style_03_wall_gray_bright'},
+ 103 | }
+ 104 | 
+ 105 | -- Builds a bordered GRIDxGRID entity layer with a goal cell and a player-start cell (the
+ 106 | -- default text-level action for 'P', per docs/developers/creating_levels/text_level.md --
+ 107 | -- without a 'P' character, make_map never creates an info_player_start entity at all, and
+ 108 | -- `updateSpawnVars` below -- which only overrides existing spawnVars -- has nothing to act on),
+ 109 | -- plus a variation layer that's uniformly non-default so `themes.lua`'s per-call
+ 110 | -- `randomMap:choice` path fires (the unnamed "default" variation always picks texture index
+ 111 | -- [1], never randomizing -- confirmed by reading themes.lua).
+ 112 | local function buildLayers(goalRow, goalCol, spawnRow, spawnCol)
+ 113 |   local n = GRID + 2  -- +1-cell wall border on each side
+ 114 |   local entityRows, variationRows = {}, {}
+ 115 |   for row = 1, n do
+ 116 |     local eChars, vChars = {}, {}
+ 117 |     for col = 1, n do
+ 118 |       local isWall = (row == 1 or row == n or col == 1 or col == n)
+ 119 |       local isGoal = (not isWall) and (row - 1 == goalRow) and (col - 1 == goalCol)
+ 120 |       local isSpawn = (not isWall) and (row - 1 == spawnRow) and (col - 1 == spawnCol)
+ 121 |       eChars[col] = isWall and '*' or (isGoal and 'G' or (isSpawn and 'P' or ' '))
+ 122 |       vChars[col] = isWall and ' ' or 'A'
+ 123 |     end
+ 124 |     entityRows[row] = table.concat(eChars)
+ 125 |     variationRows[row] = table.concat(vChars)
+ 126 |   end
+ 127 |   return table.concat(entityRows, '\n') .. '\n', table.concat(variationRows, '\n') .. '\n'
+ 128 | end
+ 129 | 
+ 130 | -- Grid cell (1-indexed, interior-relative) -> world-unit origin string "x y z".
+ 131 | -- 100 world units per cell, matching make_map's own text-level convention; +1 for the border.
+ 132 | local function cellOrigin(row, col, z)
+ 133 |   return string.format('%d %d %d', col * 100 + 50, row * 100 + 50, z or 30)
+ 134 | end
+ 135 | 
+ 136 | local tensor = require 'dmlab.system.tensor'
+ 137 | 
+ 138 | local api = {}
+ 139 | 
+ 140 | -- Level setting `goalVisible` (Lab(config={goalVisible='false'})): the paper's goal is
+ 141 | -- "unmarked" (Methods p.6), but the text-level 'G' cell spawns DMLab's visible `goal` pickup.
+ 142 | -- With goalVisible=false the pickup keeps its GOAL type, reward and collision box (pickup
+ 143 | -- collision is the engine's fixed item bounding box, not the model) but is drawn with a
+ 144 | -- zero-area model, so the agent can only find it by touching it. Default true (the original
+ 145 | -- behaviour) until the switch is decided -- see docs/paper/deviations.md, item I.
+ 146 | api._goalVisible = true
+ 147 | 
+ 148 | function api:init(params)
+ 149 |   if params.goalVisible ~= nil then
+ 150 |     api._goalVisible = params.goalVisible ~= 'false'
+ 151 |   end
+ 152 | end
+ 153 | 
+ 154 | local INVISIBLE_MODEL = 'invisible_goal_model'
+ 155 | 
+ 156 | function api:createModel(modelName)
+ 157 |   if modelName == INVISIBLE_MODEL then
+ 158 |     return {
+ 159 |         surfaces = {
+ 160 |             empty = {
+ 161 |                 vertices = tensor.FloatTensor{
+  ...
+ 170 |     }
+ 171 |   end
+ 172 | end
+ 173 | 
+ 174 | -- True episode boundary (~90s, per timeout.decorate below): the goal/cue positions and the
+ 175 | -- floor/wall texture all change here, together, matching Methods' "changed each episode" list
+ 176 | -- -- and nowhere else. `nextMap()` (which also fires on every goal touch, many times per
+ 177 | -- episode) reads and consumes `_needFullRebuild` to know whether *this* call is that boundary
+ 178 | -- or just an in-episode agent-relocation.
+ 179 | function api:start(episode, seed)
+ 180 |   random:seed(seed)
+ 181 |   randomMap:seed(random:mapGenerationSeed())
+ 182 |   api._mapCount = 0
+ 183 |   api._goalRow = random:uniformInt(1, GRID)
+ 184 |   api._goalCol = random:uniformInt(1, GRID)
+ 185 |   api._needFullRebuild = true
+ 186 |   -- DEBUG.CAMERA.TOP_DOWN defaults to a fixed camera at world origin (0,0,500) -- fine for
+ 187 |   -- maze_gen-based levels, which call debug_observations.setMaze() to recenter it, but this
+ 188 |   -- level builds via make_map.makeMap{} directly, so that never fires and the camera is left
+ 189 |   -- pointed at whatever happens to sit near the origin, not this arena (centered at
+ 190 |   -- ((GRID+2)*100/2, same) in world units, per cellOrigin's cell->world convention). Recenter
+ 191 |   -- it explicitly; look angle is left at its default ({90,90,0}, already straight down).
+ 192 |   local center = (GRID + 2) * 100 / 2
+ 193 |   debug_observations.setCameraPos{center, center, 1200}
+ 194 | end
+ 195 | 
+ 196 | function api:nextMap()
+ 197 |   -- The agent's own spawn point re-randomizes on every call (including every goal touch --
+ 198 |   -- Methods: "Upon reaching the goal the agent was teleported to another random location").
+ 199 |   -- Resample until it doesn't land on the fixed goal cell.
+ 200 |   repeat
+ 201 |     api._spawnRow = random:uniformInt(CENTER_MIN, CENTER_MAX)
+ 202 |     api._spawnCol = random:uniformInt(CENTER_MIN, CENTER_MAX)
+ 203 |   until api._spawnRow ~= api._goalRow or api._spawnCol ~= api._goalCol
+ 204 | 
+ 205 |   if not api._needFullRebuild then
+ 206 |     -- Fast restart (goal touch mid-episode): same compiled map, same texture, same goal --
+ 207 |     -- only `updateSpawnVars` below repositions the player. No q3map2 recompile. This is the
+ 208 |     -- fix for the throughput collapse: see this file's header note.
+ 209 |     return ''
+ 210 |   end
+ 211 |   api._needFullRebuild = false
+ 212 | 
+ 213 |   api._mapCount = api._mapCount + 1
+ 214 |   local entityLayer, variationLayer = buildLayers(
+ 215 |       api._goalRow, api._goalCol, api._spawnRow, api._spawnCol)
+ 216 |   -- Built explicitly (not left to make_map.makeMap's own default) so a custom
+ 217 |   -- placeWallDecals can be attached below for the intra-maze cue -- see header note.
+ 218 |   -- decalFrequency = 0 suppresses fromTextureSet's own random decorative wall decals; without
+ 219 |   -- this it would also create a theme:placeWallDecals that scatters unrelated decorative
+[OUTPUT LIMITED] Open original file for the rest.
+
+===========================================================================
+Lua generator
+===========================================================================
+Path: make_oracle_square_level.py | 39 lines | 12 matches
+   1 | #!/usr/bin/env python3
+   2 | """Make a separate oracle-enabled copy of square_arena.lua without editing the original."""
+   3 | from pathlib import Path
+   4 | 
+   5 | src = Path('levels/square_arena.lua')
+   6 | dst = Path('levels/square_arena_oracle.lua')
+   7 | if not src.is_file():
+   8 |     raise SystemExit('Run this from ~/grid-cells-torch; missing '+str(src))
+   9 | if dst.exists():
+  10 |     raise SystemExit(f'{dst} already exists. Refusing to overwrite it.')
+  11 | text = src.read_text(encoding='utf-8')
+  12 | a = "local custom_observations = require 'decorators.custom_observations'"
+  13 | if text.count(a) != 1:
+  14 |     raise SystemExit('Unexpected square_arena.lua structure: decorator import not unique')
+  15 | text = text.replace(a, "local tensor = require 'dmlab.system.tensor'\n"+a, 1)
+  16 | needle = 'timeout.decorate(api, EPISODE_LENGTH_SECONDS)'
+  17 | if text.count(needle)!=1:
+  18 |     raise SystemExit('Unexpected square_arena.lua structure: timeout call not unique')
+  19 | insert = '''-- Debug-only exact goal-cell centre, in metres. DO NOT feed to the policy
+  20 | -- before first goal arrival. Original square_arena.lua remains unchanged.
+  21 | function api:customObservationSpec()
+  22 |   return {{name='ORACLE.GOAL.XY', type='Doubles', shape={2}}}
+  23 | end
+  24 | 
+  25 | function api:customObservation(name)
+  26 |   if name == 'ORACLE.GOAL.XY' then
+  27 |     -- DMLab arena: grid cells 100 world units, 10 cells across 2.5m.
+  28 |     -- Grid cell centres in metres lie at -1.125,-0.875,...,1.125.
+  29 |     return tensor.DoubleTensor{
+  30 |       (api._goalCol - (GRID + 1) / 2) * (2.5 / GRID),
+  31 |       (api._goalRow - (GRID + 1) / 2) * (2.5 / GRID)}
+  32 |   end
+  33 |   return nil
+  34 | end
+  35 | 
+  36 | '''
+  37 | text = text.replace(needle, insert+needle, 1)
+  38 | dst.write_text(text,encoding='utf-8')
+
+===========================================================================
+Oracle runner and goal-code encoding
+===========================================================================
+Path: train_oracle_place_agent.py | 419 lines | 33 matches
+  47 |     if torch.cuda.is_available():
+  48 |         torch.cuda.manual_seed_all(seed)
+  49 | 
+  50 | 
+  51 | class OracleRunner:
+  52 |     def __init__(self, env_cfg, renderer, rank, nenv, seed):
+  53 |         self.env_cfg = env_cfg
+  54 |         import deepmind_lab
+  55 |         from grid_cells.rl_common import OBSERVATIONS
+  56 |         self.env = deepmind_lab.Lab(
+  57 |             'square_arena_oracle',
+  58 |             OBSERVATIONS + ['ORACLE.GOAL.XY'],
+  ...
+  72 | 
+  73 |     def obs(self):
+  74 |         raw = self.env.observations()
+  75 |         o = convert_observation(raw, self.env_cfg)
+  76 |         o['oracle_goal_xy'] = np.asarray(raw['ORACLE.GOAL.XY'], dtype=np.float32)
+  77 |         return o
+  78 | 
+  79 |     def reset(self):
+  80 |         self.env.reset(seed=self.seed + self.rank + self.nenv * self.episode)
+  81 |         return self.obs()
+  82 | 
+  83 |     def step(self, action):
+  84 |         reward = float(self.env.step(DISCRETE_ACTIONS[int(action)],
+  85 |                                      num_steps=self.env_cfg.action_repeat))
+  86 |         done = not self.env.is_running()
+  87 |         if done:
+  88 |             self.episode += 1
+  89 |             self.env.reset(seed=self.seed + self.rank + self.nenv * self.episode)
+  90 |         return self.obs(), reward, done
+  91 | 
+  92 |     def close(self):
+  93 |         self.env.close()
+  94 | 
+  95 | 
+  96 | def worker(pipe, cfg, renderer, rank, nenv, seed):
+  97 |     torch.set_num_threads(1)
+  ...
+ 127 |             child.close()
+ 128 |             self.pipes.append(parent)
+ 129 |             self.procs.append(proc)
+ 130 | 
+ 131 |     def reset(self):
+ 132 |         for p in self.pipes:
+ 133 |             p.send(('reset', None))
+ 134 |         return stack([p.recv() for p in self.pipes])
+ 135 | 
+ 136 |     def step(self, actions):
+ 137 |         for pipe, action in zip(self.pipes, actions):
+ 138 |             pipe.send(('step', int(action)))
+ 139 |         out = [p.recv() for p in self.pipes]
+ 140 |         obs = stack([x[0] for x in out])
+ 141 |         rewards = np.asarray([x[1] for x in out], dtype=np.float32)
+ 142 |         done = np.asarray([x[2] for x in out], dtype=np.bool_)
+ 143 |         return obs, rewards, done
+ 144 | 
+ 145 |     def close(self):
+ 146 |         for pipe in self.pipes:
+ 147 |             try:
+ 148 |                 pipe.send(('close', None))
+ 149 |             except (BrokenPipeError, EOFError):
+ 150 |                 pass
+  ...
+ 188 |     model.cnn.load_state_dict(cnn_state, strict=True)
+ 189 |     print(f'CNN: loaded pretrained vision backbone ({len(cnn_state)} tensors) from {checkpoint_path}', flush=True)
+ 190 | 
+ 191 | 
+ 192 | def oracle_codes(obs, pc, hd, device):
+ 193 |     xy = torch.as_tensor(obs['pos'], dtype=torch.float32, device=device)
+ 194 |     angle = torch.as_tensor(obs['hd'], dtype=torch.float32, device=device).reshape(-1)
+ 195 |     return torch.cat([pc.posterior(xy.unsqueeze(1)).squeeze(1),
+ 196 |                       hd.posterior(angle.unsqueeze(1)).squeeze(1)], dim=-1)
+ 197 | 
+ 198 | 
+ 199 | def goal_codes(obs, hit_angles, pc, hd, device, goal_hd):
+ 200 |     xy = torch.as_tensor(obs['oracle_goal_xy'], dtype=torch.float32, device=device)
+ 201 |     p = pc.posterior(xy.unsqueeze(1)).squeeze(1)
+ 202 |     if goal_hd == 'arrival':
+ 203 |         h = hd.posterior(hit_angles.unsqueeze(1)).squeeze(1)
+ 204 |     else:
+ 205 |         h = torch.zeros(xy.shape[0], hd.n_cells, device=device)
+ 206 |     return torch.cat([p, h], -1)
+ 207 | 
+ 208 | 
+ 209 | def reset_hidden(hidden, done):
+ 210 |     keep = (~done).to(dtype=hidden[0].dtype).view(1, -1, 1)
+ 211 |     return tuple(h * keep for h in hidden)
+ 212 | 
+ 213 | 
+ 214 | def compute_returns(rewards, done, bootstrap, gamma):
+ 215 |     # Goal rewards do not terminate an episode; only the 5400-frame timeout does.
+ 216 |     running = bootstrap
+ 217 |     result = []
+ 218 |     for r, d in zip(reversed(rewards), reversed(done)):
+ 219 |         running = r + gamma * running * (~d).float()
+ 220 |         result.append(running)
+ 221 |     return torch.stack(result[::-1])
+ 222 | 
+ 223 | 
+ 224 | def save_checkpoint(out, frames, updates, model, opt, args):
+ 225 |     state = {'frames': frames, 'updates': updates,
+  ...
+ 295 |         frame_count,update_count = int(checkpoint['frames']),int(checkpoint['updates'])
+ 296 |         print('RESUMED weights and optimizer; DMLab environments restart new episodes.',flush=True)
+ 297 |     print(f'Oracle Place Agent: {args.num_envs} workers, A2C, {args.n_step} agent actions / update, '
+ 298 |           f'{args.action_repeat} frames/action. {dim}-dim current and goal codes.', flush=True)
+ 299 |     print('Goal image hidden; oracle goal xy held out of policy until first reward.', flush=True)
+ 300 |     print('No gradient clipping. PC/HD ground truth; pretrained policy CNN weights copied, not shared.',flush=True)
+ 301 |     vec=Vec32(cfg.rl.env, args.renderer, args.num_envs, args.seed+1000)
+ 302 |     last_saved = frame_count
+ 303 |     try:
+ 304 |         obs=vec.reset()
+ 305 |         n=args.num_envs
+ 306 |         hidden=model.init_hidden(n,device)
+  ...
+ 309 |         remembered_goal=torch.zeros(n,dim,device=device)
+ 310 |         ep_frames=np.zeros(n,dtype=np.int64)
+ 311 |         ep_goals=np.zeros(n,dtype=np.int64)
+ 312 |         ep_first=np.full(n,-1,dtype=np.int64)
+ 313 |         ep_reward=np.zeros(n,dtype=np.float32)
+ 314 |         logfile=args.out_dir/'updates.csv'
+ 315 |         episode_file=args.out_dir/'episodes.csv'
+ 316 |         with logfile.open('a',newline='',buffering=1) as logf, episode_file.open('a',newline='',buffering=1) as epf:
+ 317 |             logs=csv.writer(logf)
+ 318 |             episodes=csv.writer(epf)
+ 319 |             if logfile.stat().st_size==0:
+ 320 |                 logs.writerow(['total_env_frames','optimizer_updates','loss','policy_loss','value_loss',
+ 321 |                                'entropy','mean_reward','grad_norm','fps'])
+ 322 |             if episode_file.stat().st_size==0:
+ 323 |                 episodes.writerow(['total_env_frames','env_id','episode_reward','goals','first_goal_frame'])
+ 324 |             start_wall=time.monotonic()
+ 325 |             while frame_count < args.total_env_frames:
+ 326 |                 logps,vals,ents,rews,dones=[],[],[],[],[]
+ 327 |                 observed_goals=0
+ 328 |                 for _ in range(args.n_step):
+ 329 |                     # No gradient through ground-truth spatial targets.
+ 330 |                     with torch.no_grad():
+  ...
+ 332 |                     image = image_to_input(torch.as_tensor(obs['image'],device=device))
+ 333 |                     output = model.step(image, prev_r, prev_a, spatial, remembered_goal, hidden)
+ 334 |                     dist=torch.distributions.Categorical(logits=output.action_logits)
+ 335 |                     action=dist.sample()
+ 336 |                     next_obs,reward_np,done_np=vec.step(action.detach().cpu().numpy())
+ 337 |                     reward=torch.as_tensor(reward_np,device=device)
+ 338 |                     done=torch.as_tensor(done_np,device=device,dtype=torch.bool)
+ 339 |                     goal=reward>0
+ 340 |                     observed_goals += int(goal.sum().item())
+ 341 |                     logps.append(dist.log_prob(action))
+ 342 |                     vals.append(output.value)
+ 343 |                     ents.append(dist.entropy())
+ 344 |                     rews.append(reward)
+ 345 |                     dones.append(done)
+ 346 |                     # The goal coordinate is a debug label. Never feed it to policy
+ 347 |                     # until after successful contact, and then only via the spatial code.
+ 348 |                     if goal.any():
+ 349 |                         with torch.no_grad():
+ 350 |                             pre_heading=torch.as_tensor(obs['hd'],device=device).reshape(-1)
+ 351 |                             candidate=goal_codes(next_obs,pre_heading,pc,hd,device,args.goal_hd)
+ 352 |                             remembered_goal=torch.where(goal[:,None],candidate,remembered_goal)
+ 353 |                     hidden=reset_hidden(output.hidden,done)
+ 354 |                     remembered_goal=torch.where(done[:,None],0.,remembered_goal)
+ 355 |                     prev_a=torch.where(done,torch.zeros_like(action),action)
+ 356 |                     prev_r=torch.where(done[:,None],0.,reward[:,None])
+ 357 |                     ep_frames += args.action_repeat
+ 358 |                     ep_reward += reward_np
+ 359 |                     ep_goals += (reward_np>0)
+ 360 |                     new_first=(reward_np>0) & (ep_first<0)
+ 361 |                     ep_first[new_first]=ep_frames[new_first]
+ 362 |                     for k in np.flatnonzero(done_np):
+ 363 |                         episodes.writerow([frame_count+n*args.action_repeat,int(k),
+ 364 |                                           float(ep_reward[k]),int(ep_goals[k]),int(ep_first[k])])
+ 365 |                         ep_frames[k]=0
+ 366 |                         ep_reward[k]=0
+ 367 |                         ep_goals[k]=0
+ 368 |                         ep_first[k]=-1
+ 369 |                     frame_count += n*args.action_repeat
+ 370 |                     obs=next_obs
+ 371 |                 # BPTT=100 action steps, not 100 environment frames.
+ 372 |                 with torch.no_grad():
+ 373 |                     obs_code=oracle_codes(obs,pc,hd,device)
+
+===========================================================================
+DMLab observation conversion
+===========================================================================
+Path: grid_cells/rl_common.py | 64 lines | 15 matches
+   1 | """Environment-facing helpers shared by the A2C learner, its vectorized environments and
+   2 | evaluation: DeepMind Lab construction, observation conversion, and velocity inputs."""
+   3 | import os
+   4 | 
+   5 | import numpy as np
+   6 | import torch
+   7 | 
+   8 | OBSERVATIONS = ["RGB_INTERLEAVED", "VEL.TRANS", "VEL.ROT", "DEBUG.POS.TRANS", "DEBUG.POS.ROT"]
+   9 | FRAMES_PER_SECOND = 60.0
+  10 | 
+  11 | 
+  12 | def make_dmlab_env(env_cfg, renderer: str = "hardware", width: int | None = None,
+  13 |                    height: int | None = None, level: str | None = None):
+  14 |     import deepmind_lab
+  15 |     return deepmind_lab.Lab(
+  16 |         level or env_cfg.level, OBSERVATIONS,
+  17 |         config={"width": str(width or env_cfg.width), "height": str(height or env_cfg.height),
+  18 |                 "levelDirectory": os.path.abspath(env_cfg.level_directory),
+  19 |                 "goalVisible": "true" if env_cfg.goal_visible else "false"},
+  20 |         renderer=renderer)
+  21 | 
+  22 | 
+  23 | class DMLabFactory:
+  ...
+  31 |     def __call__(self):
+  32 |         return make_dmlab_env(self.env_cfg, renderer=self.renderer, level=self.level)
+  33 | 
+  34 | 
+  35 | def world_to_meters(pos_world, env_cfg):
+  36 |     lo, hi = env_cfg.wall_world_units
+  37 |     return (pos_world - (lo + hi) / 2.0) * (env_cfg.env_size_m / (hi - lo))
+  38 | 
+  39 | 
+  40 | def convert_observation(obs: dict, env_cfg) -> dict:
+  41 |     """One DMLab observation dict -> numpy arrays in the agent's units (image stays uint8)."""
+  42 |     return {
+  43 |         "image": np.ascontiguousarray(obs["RGB_INTERLEAVED"].transpose(2, 0, 1)),
+  44 |         "pos": world_to_meters(np.asarray(obs["DEBUG.POS.TRANS"][:2], dtype=np.float32),
+  45 |                                env_cfg).astype(np.float32),
+  46 |         "hd": np.array([np.deg2rad(obs["DEBUG.POS.ROT"][1])], dtype=np.float32),
+  47 |         "vel_trans": np.asarray(obs["VEL.TRANS"], dtype=np.float32),
+  48 |         "vel_rot": np.asarray(obs["VEL.ROT"], dtype=np.float32),
+  49 |     }
+  50 | 
+  51 | 
+  52 | def image_to_input(image_uint8: torch.Tensor) -> torch.Tensor:
+  53 |     return image_uint8.float() / 127.5 - 1.0
+  54 | 
+  55 | 
+  56 | def ego_velocity(vel_trans: torch.Tensor, vel_rot: torch.Tensor, env_cfg) -> torch.Tensor:
+  57 |     """(B, 3) DMLab translational velocity (world units/s, agent frame) and (B, 3) angular
+  58 |     velocity (deg/s) -> (B, 4) grid-network input [u, v, sin dphi, cos dphi], where dphi is the
+  59 |     heading change over one action (action_repeat frames). Same convention as the A3C loop."""
+  60 |     scale = env_cfg.env_size_m / (env_cfg.wall_world_units[1] - env_cfg.wall_world_units[0])
+  61 |     dt = env_cfg.action_repeat / FRAMES_PER_SECOND
+  62 |     dtheta = torch.deg2rad(vel_rot[:, 1] * dt)
+  63 |     return torch.stack([vel_trans[:, 0] * scale, vel_trans[:, 1] * scale,
+  64 |                         torch.sin(dtheta), torch.cos(dtheta)], dim=-1)
+
+===========================================================================
+Eval reward event recording
+===========================================================================
+Path: eval_oracle_place_agent_ablation.py | 124 lines | 20 matches
+  53 |     try:
+  54 |         obs=env.reset()
+  55 |         with (args.out_dir/'episodes.csv').open('w',newline='') as logfile:
+  56 |             writer=csv.writer(logfile)
+  57 |             writer.writerow(['episode','goals','reward','first_hit_frame', 'later_mean_frames'])
+  58 |             for ep in range(args.episodes):
+  59 |                 h=model.init_hidden(1,device)
+  60 |                 prev_a=torch.zeros(1,dtype=torch.long,device=device)
+  61 |                 prev_r=torch.zeros(1,1,device=device)
+  62 |                 memory=torch.zeros(1,dim,device=device)
+  63 |                 xys=[]
+  64 |                 arrivals=[]
+  65 |                 reward_total=0.
+  66 |                 last_hit=0
+  67 |                 done=False
+  68 |                 for action_step in range(1350):
+  69 |                     batched=stack([obs])
+  70 |                     with torch.no_grad():
+  71 |                         spatial=oracle_codes(batched,pc,hd,device)
+  72 |                         image=image_to_input(torch.as_tensor(batched['image'],device=device))
+  73 |                         goal_input = memory if args.goal_mode == 'normal' else torch.zeros_like(memory)
+  74 |                         out=model.step(image,prev_r,prev_a,spatial,goal_input,h)
+  75 |                         if args.argmax:
+  76 |                             action=out.action_logits.argmax(-1)
+  77 |                         else:
+  78 |                             action=torch.distributions.Categorical(logits=out.action_logits).sample()
+  79 |                     frame=(action_step+1)*cfg.rl.env.action_repeat
+  80 |                     xys.append((frame,float(obs['pos'][0]),float(obs['pos'][1]),
+  81 |                                 float(obs['oracle_goal_xy'][0]),float(obs['oracle_goal_xy'][1])))
+  82 |                     next_obs,r,done=env.step(int(action.item()))
+  83 |                     reward_total+=r
+  84 |                     xys[-1] = (*xys[-1], int(r>0)) # hit occurs AFTER this logged position
+  85 |                     if r>0:
+  86 |                         arrivals.append(frame-last_hit)
+  87 |                         last_hit=frame
+  88 |                         with torch.no_grad():
+  89 |                             hitangle=torch.as_tensor(obs['hd'],device=device).reshape(-1)
+  90 |                             memory=goal_codes(stack([next_obs]),hitangle,pc,hd,device,goal_hd)
+  91 |                     h=out.hidden
+  92 |                     prev_a=action
+  93 |                     prev_r=torch.tensor([[r]],device=device)
+  94 |                     obs=next_obs
+  95 |                     if done:
+  96 |                         break
+  97 |                 first=arrivals[0] if arrivals else -1
+  98 |                 later=float(np.mean(arrivals[1:])) if len(arrivals)>1 else float('nan')
+  99 |                 writer.writerow([ep,len(arrivals),round(reward_total,3),first,later])
+ 100 |                 results.append({'goals':len(arrivals),'first':first,'later':later})
+ 101 |                 if ep<args.save_trajectories:
+ 102 |                     with (args.out_dir/f'trajectory_ep{ep:03d}.csv').open('w',newline='') as fh:
+ 103 |                         tw=csv.writer(fh)
+ 104 |                         tw.writerow(['frame','x_m','y_m','goal_x_m_debug','goal_y_m_debug','goal_hit'])
+ 105 |                         tw.writerows(xys)
+ 106 |                 if not done:
+ 107 |                     raise RuntimeError('Episode did not end by 5400 frames; check DeepMind Lab timeout')
+ 108 |                 if (ep+1)%10==0:
+ 109 |                     print(f'{ep+1}/{args.episodes}: mean goals={np.mean([r["goals"] for r in results]):.2f}',flush=True)
+ 110 |     finally:
+ 111 |         env.close()
+ 112 |     hits=[r['first'] for r in results if r['first']>=0]
