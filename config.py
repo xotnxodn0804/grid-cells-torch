@@ -102,7 +102,7 @@ class A2CConfig:
     vision_updates_per_rollout: int = 51
     grid_updates_per_rollout: int = 2
     replay_frames: int = 400_000
-    vision_mask_mode: str = "per_unit"
+    vision_mask_mode: str = "whole"
     reset_policy_on_goal: bool = False
     cut_return_on_goal: bool = False
     reinit_grid_on_goal: bool = False
