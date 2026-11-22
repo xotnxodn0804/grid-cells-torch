@@ -1,0 +1,152 @@
+{
+  "checkpoint_paths": {
+    "1m": "data/checkpoints/joint_nav_pilot_1m_backup/latest.pt",
+    "21m": "data/checkpoints/joint_nav_pilot_21m_backup/latest.pt"
+  },
+  "behavior_policy": "21m trained Actor on identical trajectories for both Grid/Vision pairs",
+  "episodes": 100,
+  "samples": 135000,
+  "occupied_bins": 400,
+  "space_bins": 20,
+  "vision_cue_rate": 0.052281481481481484,
+  "goal_hits_while_collecting": 235,
+  "mean_bins_visited_per_episode": 160.38,
+  "scoring": "unsmoothed 20x20 signed bottleneck maps, 39x39 SAC, 10 DeepMind annuli, both mean and minmax formulas",
+  "warning": "Score >0.37 is descriptive only. No field shuffling / p-values; inspect SAC, stability and occupancy.",
+  "models": {
+    "1m": {
+      "mean_gt_0.37": 4,
+      "minmax_gt_0.37": 1,
+      "valid_mean_scores": 512,
+      "top10": [
+        {
+          "unit": 11,
+          "mean_gridness": 0.756130045473268,
+          "minmax_gridness": 0.7279119544842243,
+          "split_half_r": 0.8471560137513896
+        },
+        {
+          "unit": 302,
+          "mean_gridness": 0.43055662698438574,
+          "minmax_gridness": 0.3526840974372214,
+          "split_half_r": 0.7376172324368321
+        },
+        {
+          "unit": 463,
+          "mean_gridness": 0.396723473033788,
+          "minmax_gridness": 0.10238751453823884,
+          "split_half_r": 0.7632729254220915
+        },
+        {
+          "unit": 360,
+          "mean_gridness": 0.37172047046191703,
+          "minmax_gridness": 0.3602321520626723,
+          "split_half_r": 0.8486928757720514
+        },
+        {
+          "unit": 26,
+          "mean_gridness": 0.36103643562782284,
+          "minmax_gridness": 0.2702515512056796,
+          "split_half_r": 0.8539376529662931
+        },
+        {
+          "unit": 48,
+          "mean_gridness": 0.3139635926173714,
+          "minmax_gridness": 0.21953588413856123,
+          "split_half_r": 0.7853796381841254
+        },
+        {
+          "unit": 250,
+          "mean_gridness": 0.2987331818918895,
+          "minmax_gridness": 0.2196518474740281,
+          "split_half_r": 0.8493569442115155
+        },
+        {
+          "unit": 72,
+          "mean_gridness": 0.2950966424858034,
+          "minmax_gridness": 0.28042797362749383,
+          "split_half_r": 0.7929448940588216
+        },
+        {
+          "unit": 386,
+          "mean_gridness": 0.2946141148501737,
+          "minmax_gridness": -0.0028941206729226412,
+          "split_half_r": 0.7986187243748442
+        },
+        {
+          "unit": 355,
+          "mean_gridness": 0.29009129182912424,
+          "minmax_gridness": 0.27578894027953993,
+          "split_half_r": 0.8629568959404068
+        }
+      ]
+    },
+    "21m": {
+      "mean_gt_0.37": 1,
+      "minmax_gt_0.37": 0,
+      "valid_mean_scores": 512,
+      "top10": [
+        {
+          "unit": 356,
+          "mean_gridness": 0.3853163651302382,
+          "minmax_gridness": 0.28206397481620193,
+          "split_half_r": 0.6072697186751138
+        },
+        {
+          "unit": 123,
+          "mean_gridness": 0.2997860064961758,
+          "minmax_gridness": 0.22126727390601714,
+          "split_half_r": 0.7267414406323777
+        },
+        {
+          "unit": 136,
+          "mean_gridness": 0.2993425503151653,
+          "minmax_gridness": 0.2351982716929263,
+          "split_half_r": 0.566219966155002
+        },
+        {
+          "unit": 215,
+          "mean_gridness": 0.2851875125705537,
+          "minmax_gridness": 0.23549182131547208,
+          "split_half_r": 0.7682619771734162
+        },
+        {
+          "unit": 155,
+          "mean_gridness": 0.2829139854721915,
+          "minmax_gridness": 0.11915435295242034,
+          "split_half_r": 0.7516410088973191
+        },
+        {
+          "unit": 470,
+          "mean_gridness": 0.27004393464588006,
+          "minmax_gridness": 0.20662822675128698,
+          "split_half_r": 0.7676895550729101
+        },
+        {
+          "unit": 321,
+          "mean_gridness": 0.24327182318492405,
+          "minmax_gridness": 0.20156707676325542,
+          "split_half_r": 0.6662773060475963
+        },
+        {
+          "unit": 83,
+          "mean_gridness": 0.2154179313928028,
+          "minmax_gridness": 0.1422442543173798,
+          "split_half_r": 0.5680497163107909
+        },
+        {
+          "unit": 444,
+          "mean_gridness": 0.20938912690293612,
+          "minmax_gridness": 0.17118517678080503,
+          "split_half_r": 0.7808211512908979
+        },
+        {
+          "unit": 353,
+          "mean_gridness": 0.20553987517654287,
+          "minmax_gridness": 0.19143780446817452,
+          "split_half_r": 0.7550137949366825
+        }
+      ]
+    }
+  }
+}
