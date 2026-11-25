@@ -53,3 +53,9 @@ Say: **“Read `RESEARCH_HANDOFF.md` in my `xotnxodn0804/grid-cells-torch` GitHu
 2. Validate raw DMLab world goal coordinates against the exported debug goal and reward/teleport timing; fix in a **versioned new run**.
 3. Re-train new correctly encoded goal policy from scratch, keeping architecture/seed/eval matched to old model for controlled comparison.
 4. Analyze vision decoder bias separately from RGB cue visibility; test wall-facing vs center-facing images at matched location.
+
+## Joint-32 update — 2026-11-25
+
+- [80M vs 169M results and 269M analysis plan](docs/experiments/2026-11-25-joint32-80m-169m-and-269m-plan.md)
+- 169M evaluation: 12.15 goals/episode; 85% first-hit success; 92.4% returns within 10 seconds.
+- 269M training ongoing; Gridness scoring and five-path analysis pending.
