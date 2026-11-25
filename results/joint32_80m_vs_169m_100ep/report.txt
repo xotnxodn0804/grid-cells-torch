@@ -1,0 +1,24 @@
+JOINT-32: 80M vs 169M | MATCHED-SEED EVALUATION
+Frames: 80M=80,000,000, 169M=168,985,600
+Episodes/model: 100, action decisions/episode: 1350, goal memory: on
+
+Metric                                      80M            169M
+Goals/episode (mean)                         7.170         12.150
+First hit success (%)                         78.0           85.0
+First hit actions (successful only)          337.9          347.1
+Total returns (100 episodes)                   639           1130
+
+Paired goals/ep delta 169M - 80M: +4.980
+Episode bootstrap 95% CI: [3.300, 6.620]
+Better/tie/worse episodes: 68/11/21
+
+Return horizons (censored-before-horizon attempts excluded):
+ 10s: 80M 77.7% (513/660, excluded=57)  |  169M 92.4% (1058/1145, excluded=69)
+ 20s: 80M 95.2% (618/649, excluded=68)  |  169M 98.6% (1121/1137, excluded=77)
+ 40s: 80M 99.4% (637/641, excluded=76)  |  169M 99.8% (1130/1132, excluded=82)
+
+CAUTION: first-hit mean conditions on success; evaluate success rate together.
+CAUTION: return-attempt rows are correlated within episodes, not independent trials.
+CAUTION: fewer heading errors do NOT establish vector-based navigation.
+CAUTION: Gridness requires a separate, properly sampled rate-map evaluation.
+CAUTION: 80M->169M included replay reset/restarted environments at 80M.
